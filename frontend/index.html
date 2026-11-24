@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DeepScan — Modern Deepfake Detection &amp; Neural Forensics</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            warm: {
+              50: '#FDFCF9',
+              100: '#FBF9F5',
+              150: '#F5F2EB',
+              200: '#EFECE5',
+              300: '#E2DDD4',
+              400: '#C7BFB3',
+              500: '#9E9485',
+              600: '#6E6659',
+              700: '#4D473D',
+              800: '#2E2B25',
+              900: '#1D1A16',
+              950: '#12100E',
+            },
+            terracotta: {
+              400: '#DE7353',
+              500: '#C25E3E',
+              600: '#A3482A',
+            },
+            amberAccent: {
+              400: '#F59E0B',
+              500: '#D97706',
+              600: '#B45309',
+            }
+          }
+        }
+      }
+    }
+</script>
+<style>
+  /* Ambient Floating Orbs */
+  @keyframes ambientFloat {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    33% { transform: translate3d(35px, -38px, 0) scale(1.12); }
+    66% { transform: translate3d(-30px, 25px, 0) scale(0.92); }
+  }
+
+  @keyframes ambientFloatSecondary {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    40% { transform: translate3d(-45px, 35px, 0) scale(1.15); }
+    75% { transform: translate3d(40px, -25px, 0) scale(0.9); }
+  }
+
+  .ambient-orb-primary {
+    animation: ambientFloat 16s ease-in-out infinite;
+  }
+
+  .ambient-orb-secondary {
+    animation: ambientFloatSecondary 20s ease-in-out infinite;
+  }
+
+  /* Scanline sweep animation */
+  @keyframes laserScan {
+    0% { top: 0%; opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .scanline-active {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #D97706, #C25E3E, #D97706, transparent);
+    box-shadow: 0 0 14px 2px rgba(217, 119, 6, 0.65), 0 0 4px rgba(194, 94, 62, 0.9);
+    animation: laserScan 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  /* Dynamic scroll reveal & dissolve styles */
+  .reveal-node {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+    transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .reveal-node.in-view {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* Subtle background grid pattern */
+  .bg-grid-subtle {
+    background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(110, 102, 89, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(110, 102, 89, 0.05) 1px, transparent 1px);
+  }
+
+  /* Frosted card overlay borders */
+  .card-frost {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(253, 252, 249, 0.86) 100%);
+    box-shadow: 
+      0 1px 2px rgba(46, 43, 37, 0.03),
+      0 12px 36px -8px rgba(46, 43, 37, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #F5F2EB;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D2CABF;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #B6ABA0;
+  }
+</style>
+</head>
+<body class="bg-[#FBF9F5] text-warm-900 font-sans antialiased selection:bg-[#EAE4D9] selection:text-warm-950 min-h-screen flex flex-col relative overflow-x-hidden">
+<!-- Subtle Ambient Warm Lighting Mesh (Fixed layered background) -->
+<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 overflow-hidden select-none">
+<div class="absolute inset-0 bg-grid-subtle opacity-60"></div>
+<!-- Interactive Cursor-Follow Track Container -->
+<div class="absolute top-0 left-0 w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform" id="ambientCursorTracker">
+<!-- Primary Amber / Peach Glow -->
+<div class="ambient-orb-primary absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[740px] h-[740px] rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.13)_0%,rgba(217,119,6,0.08)_40%,rgba(194,94,62,0.04)_70%,transparent_82%)] blur-[120px] mix-blend-multiply opacity-90"></div>
+<!-- Secondary Soft Terracotta/Rose Accent Orb -->
+<div class="ambient-orb-secondary absolute top-1/3 left-[46%] -translate-x-1/2 -translate-y-1/2 w-[540px] h-[540px] rounded-full bg-[radial-gradient(circle,rgba(194,94,62,0.1)_0%,rgba(245,158,11,0.05)_50%,transparent_78%)] blur-[110px] mix-blend-multiply opacity-80"></div>
+<!-- Lower anchor warm wash -->
+<div class="absolute top-[65%] right-[10%] w-[600px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(217,119,6,0.06)_0%,rgba(194,94,62,0.03)_55%,transparent_75%)] blur-[130px] opacity-70"></div>
+</div>
+</div>
+<!-- Floating Metadata Corner Coordinates (Technical Editorial Touch) -->
+<div class="hidden xl:flex fixed left-6 top-1/2 -translate-y-1/2 z-20 flex-col gap-6 text-[10px] font-mono text-warm-500 tracking-wider pointer-events-none select-none border-l border-warm-300/60 pl-3">
+<div>
+<span class="text-warm-400 block">COORD</span>
+<span>37.7749° N</span>
+</div>
+<div>
+<span class="text-warm-400 block">SPECTRUM</span>
+<span class="text-amber-700 font-medium">FOURIER_256</span>
+</div>
+<div>
+<span class="text-warm-400 block">STATE</span>
+<span class="inline-flex items-center gap-1.5 text-emerald-700 font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> LIVE
+    </span>
+</div>
+</div>
+<div class="hidden xl:flex fixed right-6 top-1/2 -translate-y-1/2 z-20 flex-col items-end gap-6 text-[10px] font-mono text-warm-500 tracking-wider pointer-events-none select-none border-r border-warm-300/60 pr-3">
+<div>
+<span class="text-warm-400 block text-right">PIPELINE</span>
+<span>RESNET-ENSEMBLE</span>
+</div>
+<div>
+<span class="text-warm-400 block text-right">TOLERANCE</span>
+<span>δ &lt; 0.0018</span>
+</div>
+<div>
+<span class="text-warm-400 block text-right">SYSTEM</span>
+<span class="text-warm-800">AUTH_v2.4.9</span>
+</div>
+</div>
+<!-- Warm Editorial Sticky Nav -->
+<header class="border-b border-warm-300/70 sticky top-0 z-50 bg-[#FBF9F5]/85 backdrop-blur-md transition-shadow duration-300" id="mainHeader">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+<div class="flex items-center gap-8">
+<a class="group flex items-center gap-2.5 text-warm-950 font-bold tracking-tight text-sm" href="#">
+<div class="w-7 h-7 rounded-lg bg-warm-900 text-[#FAF8F5] flex items-center justify-center font-bold text-xs shadow-md transition-transform duration-300 group-hover:scale-105 group-hover:rotate-1">
+<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path>
+<path d="M12 6v6l4 2"></path>
+</svg>
+</div>
+<div class="flex items-baseline gap-1.5">
+<span class="text-base font-extrabold tracking-tight">DeepScan</span>
+<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[#EAE4D9] text-warm-700 font-mono font-medium border border-warm-300/70">v2.4</span>
+</div>
+</a>
+<nav class="hidden md:flex items-center gap-7 text-xs text-warm-600 font-medium">
+<a class="hover:text-warm-950 transition-colors py-1 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1.5px] after:bg-warm-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform" href="#workspace">Inspection</a>
+<a class="hover:text-warm-950 transition-colors py-1 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1.5px] after:bg-warm-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform" href="#pipeline">How it works</a>
+<a class="hover:text-warm-950 transition-colors py-1 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1.5px] after:bg-warm-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform" href="#api">Developer API</a>
+</nav>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-xs text-warm-700 hover:text-warm-950 px-3 py-1.5 rounded-lg transition font-medium hidden sm:inline-flex" type="button">Documentation</button>
+<button class="text-xs bg-warm-950 text-[#FAF8F5] hover:bg-warm-800 font-medium px-4 py-2 rounded-xl transition duration-200 shadow-sm hover:shadow flex items-center gap-1.5" type="button">
+<span>Get API Key</span>
+<i class="w-3.5 h-3.5" data-lucide="arrow-up-right"></i>
+</button>
+</div>
+</div>
+</header>
+<main class="flex-1 relative z-10">
+<!-- Hero & Primary Inspection Workspace (Overlapping Layer Plane 1) -->
+<section class="max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-20 relative" id="workspace">
+<!-- Editorial Typography Title Section with Dissolve Animation -->
+<div class="text-center max-w-3xl mx-auto space-y-4 mb-10 reveal-node">
+<div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass-pill border border-warm-300 text-xs text-warm-700 font-medium shadow-xs">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+</span>
+<span class="tracking-tight font-medium text-warm-800">Neural Forensic Pipeline &amp; Artifact Telemetry</span>
+</div>
+<h1 class="text-3xl sm:text-5xl lg:text-[3.4rem] font-bold tracking-tight text-warm-950 leading-[1.12]">
+        Detect AI-generated and <br class="hidden sm:inline"/>
+<span class="bg-gradient-to-r from-warm-950 via-warm-800 to-terracotta-600 bg-clip-text text-transparent">manipulated faces</span>
+</h1>
+<p class="text-sm sm:text-base text-warm-600 max-w-xl mx-auto font-normal leading-relaxed pt-1">
+        Analyze the full image with HOG/LBP features, then review supervised real/fake probabilities and gradient hotspots.
+      </p>
+</div>
+<!-- Main Inspection Card (Tactile Layer with Soft Sand Depth) -->
+<div class="card-frost border border-warm-300/80 rounded-3xl shadow-[0_16px_40px_-12px_rgba(46,43,37,0.08),0_1px_3px_rgba(46,43,37,0.04)] overflow-hidden transition-all duration-300 reveal-node">
+<div class="p-6 sm:p-9 space-y-6">
+<!-- Dropzone and Preview Container -->
+<div class="relative">
+<input accept="image/*" class="hidden" id="imageInput" type="file"/>
+<!-- Interactive Dropzone -->
+<div class="group relative border-2 border-dashed border-warm-300 hover:border-amber-600/60 rounded-2xl p-8 sm:p-10 text-center bg-[#FAF8F5]/80 hover:bg-[#F6F2EA]/90 transition-all duration-300 cursor-pointer min-h-[240px] flex flex-col items-center justify-center overflow-hidden" id="dropZone">
+<!-- Dynamic scanline element for active testing -->
+<div class="hidden" id="scanlineElement"></div>
+<!-- Empty State -->
+<div class="space-y-3 relative z-10 transition-transform duration-200 group-hover:-translate-y-0.5" id="dropZoneEmpty">
+<div class="w-13 h-13 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-white border border-warm-300/90 flex items-center justify-center text-warm-700 shadow-sm group-hover:scale-105 group-hover:text-warm-900 group-hover:border-warm-400 transition-all duration-300">
+<i class="w-6 h-6 stroke-[1.75]" data-lucide="scan-face"></i>
+</div>
+<div class="space-y-1">
+<p class="text-sm sm:text-base font-semibold text-warm-950">
+                  Drop image here, or <span class="text-amber-800 underline underline-offset-4 decoration-amber-400/60 hover:decoration-amber-800 font-medium">browse files</span>
+</p>
+<p class="text-xs text-warm-500 font-normal">Supports JPG, PNG, WEBP, BMP, or TIFF up to 10MB • analyzes the full image</p>
+</div>
+</div>
+<!-- Preview State (Hidden initially) -->
+<div class="hidden w-full flex flex-col items-center justify-center gap-4 relative z-10" id="imagePreview">
+<div class="relative max-h-[250px] rounded-xl overflow-hidden border border-warm-300 shadow-md bg-warm-200/50 group/img">
+<img alt="Target preview" class="max-h-[230px] w-auto object-contain transition-transform duration-500 group-hover/img:scale-105" id="previewImgElement" src=""/>
+<!-- Target Reticle Overlay -->
+<div class="absolute inset-0 pointer-events-none border border-white/30 flex items-center justify-center">
+<div class="w-16 h-16 border border-amber-400/40 rounded-full opacity-60"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-xs font-mono text-warm-700 bg-white/90 px-3 py-1.5 rounded-lg border border-warm-300 shadow-xs flex items-center gap-1.5" id="fileNameBadge">
+<i class="w-3 h-3 text-warm-500" data-lucide="file-check"></i>
+                  sample.png
+                </span>
+<button class="text-xs text-warm-800 hover:text-warm-950 px-3 py-1.5 rounded-lg bg-warm-200/70 hover:bg-warm-300/80 border border-warm-300 font-medium transition flex items-center gap-1" id="changeMediaBtn" type="button">
+<i class="w-3 h-3" data-lucide="refresh-cw"></i>
+                  Replace
+                </button>
+</div>
+</div>
+</div>
+<!-- Quick Presets with active pill tags -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-warm-600 mt-3.5 px-1 font-medium">
+<div class="flex items-center gap-1.5">
+<i class="w-3.5 h-3.5 text-warm-400" data-lucide="sparkle"></i>
+<span>Instant synthetic benchmark files:</span>
+</div>
+<div class="flex items-center gap-2" id="sampleBtnGroup">
+<button class="group px-3 py-1.5 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-600/30 transition shadow-xs flex items-center gap-1.5 active:scale-95" id="btnSampleReal" onclick="loadSampleAuthentic()" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+<span>Sample Real</span>
+</button>
+<button class="group px-3 py-1.5 rounded-lg bg-white hover:bg-amber-50 text-terracotta-600 border border-terracotta-500/30 transition shadow-xs flex items-center gap-1.5 active:scale-95" id="btnSampleFake" onclick="loadSampleSynthetic()" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-terracotta-500"></span>
+<span>Sample AI Fake</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Controls Bar: Model & Primary Trigger -->
+<div class="pt-5 border-t border-warm-200/90 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+<div class="flex-1 max-w-sm">
+<label class="block text-xs font-semibold text-warm-800 mb-1.5 flex items-center justify-between" for="modelSelect">
+<span>Detection Model</span>
+<span class="text-[10px] font-mono text-warm-500 font-normal">v2.4 Core</span>
+</label>
+<div class="relative">
+<select class="w-full bg-white border border-warm-300 hover:border-warm-500 focus:border-warm-900 rounded-xl px-3.5 py-2.5 text-xs text-warm-900 focus:outline-none transition appearance-none cursor-pointer pr-9 font-medium shadow-xs" id="modelSelect">
+<option selected="" value="svm">SVM Classifier [Recommended]</option>
+<option value="ensemble">Ensemble (Soft Voting)</option>
+<option value="random_forest">Random Forest (Bagging)</option>
+<option value="ann">Neural Network (Backpropagation MLP)</option>
+<option value="decision_tree">Decision Tree Classifier</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-warm-500">
+<i class="w-3.5 h-3.5" data-lucide="chevron-down"></i>
+</div>
+</div>
+</div>
+<div class="sm:self-end">
+<button class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-warm-950 text-[#FAF8F5] hover:bg-warm-800 active:scale-98 font-semibold text-xs tracking-tight transition duration-200 flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_14px_rgba(29,26,22,0.15)] hover:shadow-[0_6px_20px_rgba(29,26,22,0.22)]" id="predictBtn">
+<span class="hidden" id="btnSpinner">
+<svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewbox="0 0 24 24">
+<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+<path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+</svg>
+</span>
+<i class="w-3.5 h-3.5 text-amber-300" data-lucide="sparkles" id="btnIcon"></i>
+<span id="btnText">Analyze Image</span>
+</button>
+</div>
+</div>
+</div>
+<!-- ======================================================== -->
+<!-- RESULTS SECTION (id="resultContainer")                    -->
+<!-- ======================================================== -->
+<div class="hidden border-t border-warm-300/80 bg-[#FAF7F2] p-6 sm:p-9 space-y-7 transition-all duration-700" id="resultContainer">
+<!-- Verdict Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="text-[11px] font-mono uppercase tracking-wider text-warm-500 font-semibold">Forensic Telemetry</span>
+<span class="text-warm-300">•</span>
+<span class="text-[11px] font-mono text-warm-500" id="latencyText">Latency: --ms</span>
+</div>
+<h3 class="text-xl font-bold text-warm-950 mt-1">Dataset-Based Classifier Result</h3>
+</div>
+<!-- Result Badge ID -->
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border shadow-xs transition-all duration-300" id="resultBadge">
+            Awaiting analysis
+          </div>
+</div>
+<p class="text-xs leading-relaxed text-warm-600">
+  This prototype can misclassify images from sources or generators not represented in its training data.
+  Treat results as a screening signal, not proof of authenticity.
+</p>
+<!-- Dual Split Percentage Bar & Confidence telemetry -->
+<div class="p-5 rounded-2xl bg-white border border-warm-300 space-y-3.5 shadow-sm">
+<div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+<span class="text-warm-700 font-medium">
+              Model score (not verified authenticity): 
+              <strong class="text-warm-950 font-mono text-sm ml-1 font-semibold" id="confidenceText">--</strong>
+</span>
+<div class="flex items-center gap-5 text-xs font-mono font-medium">
+<span class="inline-flex items-center gap-1.5 text-emerald-800">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                Real: <span class="font-bold" id="realPctText">0%</span>
+</span>
+<span class="inline-flex items-center gap-1.5 text-terracotta-600">
+<span class="w-2 h-2 rounded-full bg-terracotta-500"></span>
+                AI Fake: <span class="font-bold" id="fakePctText">0%</span>
+</span>
+</div>
+</div>
+<!-- realFakeBar Container -->
+<div class="w-full h-3 bg-warm-200/80 rounded-full overflow-hidden flex p-0.5" id="realFakeBar">
+<div class="bg-emerald-600 h-full rounded-l-full transition-all duration-700 ease-out shadow-xs" id="realBarSegment" style="width: 50%;"></div>
+<div class="bg-terracotta-500 h-full rounded-r-full transition-all duration-700 ease-out shadow-xs" id="fakeBarSegment" style="width: 50%;"></div>
+</div>
+<div class="flex justify-between items-center text-[10px] font-mono text-warm-500 pt-0.5">
+<span>PREDICTED REAL PROBABILITY</span>
+<span>PREDICTED FAKE PROBABILITY</span>
+</div>
+</div>
+<!-- Side-by-Side Comparison -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+<!-- Left: Extracted Face -->
+<div class="space-y-2">
+<div class="flex items-center justify-between">
+<span class="text-xs text-warm-800 font-semibold flex items-center gap-1.5">
+<i class="w-3.5 h-3.5 text-warm-500" data-lucide="crop"></i>
+                Analyzed Image
+              </span>
+<span class="text-[10px] font-mono text-warm-500">128 × 128 px</span>
+</div>
+<div class="aspect-square rounded-2xl bg-warm-200 border border-warm-300 overflow-hidden flex items-center justify-center shadow-xs relative group">
+<img alt="Cropped target" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" id="resultCroppedFace" src=""/>
+<div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-warm-950/70 text-white text-[10px] font-mono backdrop-blur-xs">
+                FULL_IMAGE
+              </div>
+</div>
+</div>
+<!-- Right: Heatmap Container ID -->
+<div class="space-y-2">
+<div class="flex items-center justify-between">
+<span class="text-xs text-warm-800 font-semibold flex items-center gap-1.5">
+<i class="w-3.5 h-3.5 text-amber-600" data-lucide="activity"></i>
+                Texture Activity Heatmap
+              </span>
+<span class="text-[10px] font-mono text-amber-700">Sobel Texture Map</span>
+</div>
+<div class="aspect-square rounded-2xl bg-warm-900 border border-warm-300 overflow-hidden relative flex items-center justify-center shadow-xs" id="heatmapContainer">
+<canvas class="w-full h-full object-cover" height="256" id="heatmapCanvas" width="256"></canvas>
+<div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-md bg-warm-950/85 backdrop-blur border border-warm-700/60 text-[10px] text-warm-200 font-mono flex items-center gap-1.5 shadow">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                Gradient Activity
+              </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Layered Overlapping Section 2: Pipeline Methodology -->
+<section class="border-t border-warm-300/80 py-20 bg-[#F4F0E8] relative -mt-6 rounded-t-[2.5rem] shadow-[0_-12px_32px_rgba(46,43,37,0.03)]" id="pipeline">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 space-y-12">
+<div class="max-w-xl space-y-2 reveal-node">
+<span class="text-xs font-mono text-amber-800 uppercase tracking-wider font-semibold">Diagnostic Architecture</span>
+<h2 class="text-2xl sm:text-3xl font-bold text-warm-950 tracking-tight">How the detection pipeline works</h2>
+<p class="text-xs sm:text-sm text-warm-600 leading-relaxed">
+          A local feature pipeline that crops faces, computes HOG/LBP descriptors, and compares supervised classifiers.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Step 1 -->
+<div class="p-7 rounded-2xl bg-white/90 backdrop-blur-sm border border-warm-300 space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 reveal-node">
+<div class="flex items-center justify-between">
+<span class="text-xs font-mono font-bold text-amber-700 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/60">STAGE 01</span>
+<i class="w-4 h-4 text-warm-400" data-lucide="scan"></i>
+</div>
+<h3 class="text-base font-semibold text-warm-950">Face Extraction &amp; Alignment</h3>
+<p class="text-xs text-warm-600 leading-relaxed font-normal">
+            Detects and crops the largest face with an OpenCV Haar Cascade, then resizes it to 128×128. If no face is found, a centered square crop is used.
+          </p>
+</div>
+<!-- Step 2 -->
+<div class="p-7 rounded-2xl bg-white/90 backdrop-blur-sm border border-warm-300 space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 reveal-node">
+<div class="flex items-center justify-between">
+<span class="text-xs font-mono font-bold text-amber-700 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/60">STAGE 02</span>
+<i class="w-4 h-4 text-warm-400" data-lucide="waves"></i>
+</div>
+<h3 class="text-base font-semibold text-warm-950">HOG &amp; LBP Feature Extraction</h3>
+<p class="text-xs text-warm-600 leading-relaxed font-normal">
+            Builds Histogram of Oriented Gradients (HOG) and Local Binary Pattern (LBP) features to represent facial shape and texture.
+          </p>
+</div>
+<!-- Step 3 -->
+<div class="p-7 rounded-2xl bg-white/90 backdrop-blur-sm border border-warm-300 space-y-3.5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 reveal-node">
+<div class="flex items-center justify-between">
+<span class="text-xs font-mono font-bold text-amber-700 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/60">STAGE 03</span>
+<i class="w-4 h-4 text-warm-400" data-lucide="shield-check"></i>
+</div>
+<h3 class="text-base font-semibold text-warm-950">Classification &amp; Heatmap</h3>
+<p class="text-xs text-warm-600 leading-relaxed font-normal">
+            The selected classifier returns real/fake probabilities. A soft-voting ensemble combines model probabilities; the gradient overlay is a visual aid, not a model explanation.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Layered Overlapping Section 3: Developer API -->
+<section class="border-t border-warm-300/80 py-20 bg-[#FAF7F2] relative -mt-6 rounded-t-[2.5rem] shadow-[0_-12px_32px_rgba(46,43,37,0.03)]" id="api">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 reveal-node">
+<div class="space-y-1.5">
+<span class="text-xs font-mono text-amber-800 uppercase tracking-wider font-semibold">Integrations</span>
+<h2 class="text-2xl sm:text-3xl font-bold text-warm-950 tracking-tight">Developer API</h2>
+<p class="text-xs sm:text-sm text-warm-600">Integrate programmatic authenticity checks with standard multipart POST endpoints.</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-xs font-mono px-2.5 py-1 rounded bg-warm-200/70 text-warm-700 border border-warm-300 font-medium">REST Endpoint</span>
+</div>
+</div>
+<!-- Warm Roast Code Terminal Container -->
+<div class="rounded-2xl bg-[#1D1A17] border border-[#38332D] p-6 font-mono text-xs overflow-x-auto text-[#ECE5D8] shadow-xl relative reveal-node group">
+<div class="flex items-center justify-between border-b border-[#35302A] pb-3 mb-4 text-[#8C8377] text-[11px]">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-[#423B33]"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-[#423B33]"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-[#423B33]"></span>
+<span class="ml-2 text-warm-400 font-medium">predict.js</span>
+</div>
+<span class="text-amber-500/80">POST /predict</span>
+</div>
+<pre class="leading-relaxed"><code><span class="text-[#968E82]">// POST http://127.0.0.1:8000/predict</span>
+<span class="text-[#D4A373]">const</span> formData = <span class="text-[#D4A373]">new</span> FormData();
+formData.append(<span class="text-[#E7C186]">'file'</span>, imageFile);
+formData.append(<span class="text-[#E7C186]">'model'</span>, <span class="text-[#E7C186]">'svm'</span>);
+
+<span class="text-[#D4A373]">const</span> res = <span class="text-[#D4A373]">await</span> fetch(<span class="text-[#E7C186]">'http://127.0.0.1:8000/predict'</span>, {
+  method: <span class="text-[#E7C186]">'POST'</span>,
+  body: formData
+});
+
+<span class="text-[#D4A373]">const</span> { verdict, confidence, fake_pct } = <span class="text-[#D4A373]">await</span> res.json();
+console.log(<span class="text-[#E7C186]">`Verdict: ${verdict} (${confidence}%)`</span>);</code></pre>
+</div>
+</div>
+</section>
+</main>
+<!-- Warm Clean Footer -->
+<footer class="border-t border-warm-300 py-8 text-xs text-warm-600 bg-[#EFECE5] relative z-10">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-md bg-warm-900 text-white flex items-center justify-center font-bold text-[10px]">D</div>
+<span class="font-medium text-warm-800">DeepScan Engine © 2025 • Neural Authenticity Standard</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="hover:text-warm-950 transition" href="#">Privacy Protocol</a>
+<a class="hover:text-warm-950 transition" href="#">Terms of Service</a>
+<a class="hover:text-warm-950 transition" href="#">Model Weights</a>
+<a class="hover:text-warm-950 transition font-medium" href="#">GitHub</a>
+</div>
+</div>
+</footer>
+<!-- Toast Notification element -->
+<div class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 text-xs px-4 py-3 rounded-xl border bg-white border-warm-300 text-warm-950 shadow-2xl flex items-center gap-2.5 font-medium" id="toast">
+<i class="w-4 h-4 text-amber-600" data-lucide="info"></i>
+<span id="toastMsg">Ready</span>
+</div>
+<!-- Vanilla JS Engine with IntersectionObserver & Interactive Scanline -->
+<script>
+  lucide.createIcons();
+
+  // Core Backend & Functional IDs
+  const imageInput = document.getElementById('imageInput');
+  const imagePreview = document.getElementById('imagePreview');
+  const previewImgElement = document.getElementById('previewImgElement');
+  const dropZone = document.getElementById('dropZone');
+  const dropZoneEmpty = document.getElementById('dropZoneEmpty');
+  const fileNameBadge = document.getElementById('fileNameBadge');
+  const modelSelect = document.getElementById('modelSelect');
+  const predictBtn = document.getElementById('predictBtn');
+  const btnSpinner = document.getElementById('btnSpinner');
+  const btnIcon = document.getElementById('btnIcon');
+  const btnText = document.getElementById('btnText');
+  const resultContainer = document.getElementById('resultContainer');
+  const resultBadge = document.getElementById('resultBadge');
+  const confidenceText = document.getElementById('confidenceText');
+  const realFakeBar = document.getElementById('realFakeBar');
+  const realBarSegment = document.getElementById('realBarSegment');
+  const fakeBarSegment = document.getElementById('fakeBarSegment');
+  const realPctText = document.getElementById('realPctText');
+  const fakePctText = document.getElementById('fakePctText');
+  const heatmapCanvas = document.getElementById('heatmapCanvas');
+  const heatmapContainer = document.getElementById('heatmapContainer');
+  const resultCroppedFace = document.getElementById('resultCroppedFace');
+  const scanlineElement = document.getElementById('scanlineElement');
+
+  let currentSelectedFile = null;
+
+  // 1. Dynamic Scroll Dissolve & Staggered Reveal via IntersectionObserver
+  const revealElements = document.querySelectorAll('.reveal-node');
+  const observerOptions = {
+    root: null,
+    rootMargin: '0px',
+    threshold: 0.12
+  };
+
+  const revealObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+      }
+    });
+  }, observerOptions);
+
+  revealElements.forEach(el => revealObserver.observe(el));
+
+  // 2. Interactive Ambient Light Mouse Tracker
+  const ambientTracker = document.getElementById('ambientCursorTracker');
+  if (ambientTracker) {
+    let mouseX = 0, mouseY = 0;
+    let targetX = 0, targetY = 0;
+    let rafId = null;
+
+    window.addEventListener('mousemove', (e) => {
+      const relX = (e.clientX / window.innerWidth) - 0.5;
+      const relY = (e.clientY / window.innerHeight) - 0.5;
+      targetX = relX * 80;
+      targetY = relY * 60;
+
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateAmbientPosition);
+      }
+    }, { passive: true });
+
+    function updateAmbientPosition() {
+      mouseX += (targetX - mouseX) * 0.05;
+      mouseY += (targetY - mouseY) * 0.05;
+      ambientTracker.style.transform = `translate3d(${mouseX.toFixed(2)}px, ${mouseY.toFixed(2)}px, 0)`;
+
+      if (Math.abs(targetX - mouseX) > 0.05 || Math.abs(targetY - mouseY) > 0.05) {
+        rafId = requestAnimationFrame(updateAmbientPosition);
+      } else {
+        rafId = null;
+      }
+    }
+  }
+
+  // 3. Dropzone & File Handling
+  dropZone.addEventListener('click', (e) => {
+    if (e.target.id !== 'changeMediaBtn' && !e.target.closest('#changeMediaBtn')) {
+      imageInput.click();
+    }
+  });
+
+  document.getElementById('changeMediaBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    imageInput.click();
+  });
+
+  ['dragenter', 'dragover'].forEach(name => {
+    dropZone.addEventListener(name, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-amber-600', 'bg-amber-50/50');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(name => {
+    dropZone.addEventListener(name, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-amber-600', 'bg-amber-50/50');
+    });
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) handleFile(files[0]);
+  });
+
+  imageInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) {
+      showToast("Please upload an image file (JPG, PNG, WebP).");
+      return;
+    }
+    currentSelectedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      showPreview(e.target.result, file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showPreview(src, name) {
+    previewImgElement.src = src;
+    dropZoneEmpty.classList.add('hidden');
+    imagePreview.classList.remove('hidden');
+    fileNameBadge.innerHTML = `<i class="w-3 h-3 text-warm-500" data-lucide="file-check"></i> ${name}`;
+    lucide.createIcons();
+    triggerScanSweep();
+  }
+
+  // Visual scanline feedback sweep
+  function triggerScanSweep() {
+    scanlineElement.className = "scanline-active";
+    setTimeout(() => {
+      scanlineElement.className = "hidden";
+    }, 1800);
+  }
+
+  // Sample SVG portrait generators with authentic warm tones
+  function getSampleSVG(isFake) {
+    const faceColor = isFake ? "%23F8D4B0" : "%23F3DAC6";
+    const detailStroke = isFake ? "%23C25E3E" : "%234D473D";
+    const shirtColor = isFake ? "%23A3482A" : "%234A453F";
+    const extraArtifacts = isFake 
+      ? `<path d="M 110 115 Q 125 105 140 118" stroke="%23D97706" stroke-width="2.5" fill="none" opacity="0.8"/>
+         <circle cx="165" cy="180" r="14" fill="%23C25E3E" opacity="0.25"/>`
+      : ``;
+
+    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+      <rect width="320" height="320" fill="%23EFECE5"/>
+      <circle cx="160" cy="150" r="76" fill="${faceColor}"/>
+      <circle cx="132" cy="140" r="8.5" fill="%232E2B25"/>
+      <circle cx="188" cy="140" r="8.5" fill="%232E2B25"/>
+      <circle cx="134" cy="138" r="2.5" fill="%23FFFFFF"/>
+      <circle cx="190" cy="138" r="2.5" fill="%23FFFFFF"/>
+      <path d="M 136 182 Q 160 202 184 182" stroke="${detailStroke}" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M 90 310 Q 160 250 230 310" fill="${shirtColor}"/>
+      ${extraArtifacts}
+    </svg>`;
+  }
+
+  function dataURLtoFile(dataurl, filename) {
+    const commaIndex = dataurl.indexOf(',');
+    const metadata = dataurl.slice(0, commaIndex);
+    const mime = metadata.match(/:(.*?)(?:;|$)/)[1];
+    const payload = dataurl.slice(commaIndex + 1);
+    const contents = metadata.includes(';base64')
+      ? Uint8Array.from(atob(payload), character => character.charCodeAt(0))
+      : decodeURIComponent(payload);
+    return new File([contents], filename, { type: mime });
+  }
+
+  function loadSampleAuthentic() {
+    const uri = getSampleSVG(false);
+    currentSelectedFile = dataURLtoFile(uri, "verified_real_portrait.jpg");
+    showPreview(uri, "verified_real_portrait.jpg");
+    showToast("Loaded natural biological portrait");
+  }
+
+  function loadSampleSynthetic() {
+    const uri = getSampleSVG(true);
+    currentSelectedFile = dataURLtoFile(uri, "ai_synthetic_diffusion.png");
+    showPreview(uri, "ai_synthetic_diffusion.png");
+    showToast("Loaded synthetic face sample with latent noise");
+  }
+
+  // Draw returned texture-hotspot coordinates without changing the result layout.
+  function drawHeatmap(isFake, coordinates = []) {
+    const ctx = heatmapCanvas.getContext('2d');
+    const w = heatmapCanvas.width;
+    const h = heatmapCanvas.height;
+
+    ctx.fillStyle = '#1D1A17';
+    ctx.fillRect(0, 0, w, h);
+
+    coordinates.forEach(({ x, y, intensity }) => {
+      const centerX = Math.max(0, Math.min(1, x)) * w;
+      const centerY = Math.max(0, Math.min(1, y)) * h;
+      const radius = 16 + Math.max(0, Math.min(1, intensity)) * 30;
+      const gradient = ctx.createRadialGradient(centerX, centerY, 2, centerX, centerY, radius);
+      gradient.addColorStop(0, isFake ? 'rgba(224, 79, 46, 0.82)' : 'rgba(45, 212, 191, 0.72)');
+      gradient.addColorStop(0.55, isFake ? 'rgba(229, 138, 56, 0.42)' : 'rgba(13, 148, 136, 0.35)');
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+    });
+  }
+
+  async function rasterizeSvg(file) {
+    if (!file.type.includes('svg')) return file;
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = () => reject(new Error('The sample image could not be decoded.'));
+        image.src = objectUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      canvas.getContext('2d').drawImage(image, 0, 0);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      if (!blob) throw new Error('The sample image could not be converted to JPEG.');
+      return new File([blob], file.name.replace(/\.svg$/i, '.jpg'), { type: 'image/jpeg' });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  // Predict Action Logic
+  predictBtn.addEventListener('click', async () => {
+    if (!currentSelectedFile) {
+      showToast("Please upload an image or choose a preset.");
+      return;
+    }
+
+    setLoading(true);
+    triggerScanSweep();
+
+    try {
+      const formData = new FormData();
+      const uploadFile = await rasterizeSvg(currentSelectedFile);
+      formData.append('file', uploadFile);
+      formData.append('model', modelSelect.value);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      let res;
+      try {
+        res = await fetch('http://127.0.0.1:8000/predict', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `The API returned HTTP ${res.status}.`);
+      displayResults(data);
+    } catch (error) {
+      const message = error.name === 'AbortError'
+        ? 'Analysis timed out. Please try again.'
+        : (error.message || 'Unable to reach the detection API.');
+      showToast(message);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  function setLoading(isLoading) {
+    predictBtn.disabled = isLoading;
+    if (isLoading) {
+      btnSpinner.classList.remove('hidden');
+      btnIcon.classList.add('hidden');
+      btnText.textContent = "Extracting Features...";
+    } else {
+      btnSpinner.classList.add('hidden');
+      btnIcon.classList.remove('hidden');
+      btnText.textContent = "Analyze Image";
+    }
+  }
+
+  function displayResults(data) {
+    resultContainer.classList.remove('hidden');
+    resultCroppedFace.src = previewImgElement.src;
+    const faceStatus = resultCroppedFace.nextElementSibling;
+    if (faceStatus) faceStatus.textContent = 'FULL_IMAGE';
+
+    const isFake = data.isFake !== undefined 
+      ? data.isFake 
+      : data.verdict.toLowerCase().includes('manipulated') || data.verdict.toLowerCase().includes('ai');
+    const isUncertain = data.isUncertain === true;
+
+    if (isUncertain) {
+      resultBadge.className = "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border bg-amber-50 border-amber-400/50 text-amber-800";
+      resultBadge.textContent = "Uncertain — cannot verify";
+    } else if (isFake) {
+      resultBadge.className = "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border bg-[#FDF1EC] border-terracotta-500/40 text-terracotta-600";
+      resultBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-terracotta-500 animate-pulse"></span> Synthetic / AI Generated`;
+    } else {
+      resultBadge.className = "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border bg-[#EDF8F4] border-emerald-600/30 text-emerald-800";
+      resultBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span> Biological / Real Portrait`;
+    }
+
+    confidenceText.textContent = `${data.confidence}%`;
+    const latencyText = document.getElementById('latencyText');
+    if (latencyText && data.latency_ms !== undefined) {
+      latencyText.textContent = `Latency: ${data.latency_ms}ms`;
+    }
+    realPctText.textContent = `${data.real_pct}%`;
+    fakePctText.textContent = `${data.fake_pct}%`;
+
+    realBarSegment.style.width = `${data.real_pct}%`;
+    fakeBarSegment.style.width = `${data.fake_pct}%`;
+
+    drawHeatmap(isFake === true, data.heatmap_coordinates || []);
+    // Smooth scroll down to highlight forensic result
+    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    setTimeout(() => {
+      toast.classList.add('translate-y-20', 'opacity-0');
+    }, 2800);
+  }
+
+</script>
+</body></html>
