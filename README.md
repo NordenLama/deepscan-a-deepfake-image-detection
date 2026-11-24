@@ -1,7 +1,8 @@
 # DeepScan — Deepfake Image Detection
 
 This project classifies full images as **real** or **AI-generated/manipulated** with
-hand-engineered HOG shape and LBP texture features and supervised scikit-learn models.
+hand-engineered HOG shape, LBP texture, and FFT frequency features with supervised
+scikit-learn models.
 It is an academic prototype; its output is not proof of authenticity.
 
 ## Dataset
@@ -22,6 +23,16 @@ resolutions, and lighting. Keep the classes representative of the intended use a
 use images with appropriate rights.
 
 ## Install, train, and run
+
+The saved `.joblib` models are stored with Git LFS because the ensemble exceeds
+GitHub's regular file-size limit. Install Git LFS before cloning so the model files
+are downloaded rather than their small pointer files:
+
+```powershell
+git lfs install
+git clone https://github.com/NordenLama/deepscan-a-deepfake-image-detection.git
+Set-Location deepscan-a-deepfake-image-detection
+```
 
 From the project directory, create/activate a virtual environment and install:
 
