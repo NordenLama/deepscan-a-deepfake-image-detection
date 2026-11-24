@@ -1,7 +1,7 @@
 # DeepScan — Deepfake Image Detection
 
 This project classifies full images as **real** or **AI-generated/manipulated** with
-hand-engineered HOG shape, LBP texture, and FFT frequency features with supervised
+hand-engineered HOG shape, LBP texture, and FFT frequency features, plus supervised
 scikit-learn models.
 It is an academic prototype; its output is not proof of authenticity.
 
@@ -85,9 +85,9 @@ can report a useful error; `/predict` returns HTTP 503 until the requested model
 
 ## Syllabus scope
 
-The implementation uses supervised feature engineering (HOG/LBP), training-fold
-outlier detection and imbalance handling, an ANN trained by backpropagation, classical
-classifiers, cross-validation, standard classification metrics, and bagging/soft voting.
-It also reports supplementary Module 6 association rules between above-median LBP
+The implementation uses supervised feature engineering (HOG/LBP/FFT), training-fold
+imbalance handling, an ANN trained by backpropagation, classical classifiers,
+cross-validation, standard classification metrics, and bagging/soft voting. It also
+reports supplementary Module 6 association rules between above-median LBP
 histogram bins and class labels; these rules are descriptive and do not replace the
 supervised classifiers. It does not use Hidden Markov Models or clustering.
